@@ -1,0 +1,34 @@
+<mujoco model="g1 navigation floor entity">
+  <!-- Ground-plane entity for the composed navigation environment
+       (body-wrapped root per UniLab entity composition rules). -->
+  <option integrator="implicitfast" timestep="0.005" solver="Newton" iterations="10" ls_iterations="20"/>
+  <visual>
+    <!-- Camera-attached headlight keeps every visible surface lit; combined
+         with the fixed directional light below the scene is always fully
+         bright regardless of camera/robot pose. -->
+    <headlight ambient="0.55 0.55 0.55" diffuse="0.9 0.9 0.9" specular="0.2 0.2 0.2"/>
+    <map fogstart="100.0" fogend="300.0"/>
+    <rgba haze="0.75 0.75 0.77 1"/>
+    <global azimuth="140" elevation="-20"/>
+  </visual>
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.55 0.55 0.57" rgb2="0.55 0.55 0.57" width="512" height="3072"/>
+    <texture type="2d" name="groundplane" builtin="checker" rgb1="0.62 0.62 0.63" rgb2="0.49 0.49 0.51"
+      width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="1.25 1.25" reflectance="0.0"/>
+  </asset>
+  <worldbody>
+    <!-- World-level fixed light, identical to the g1 walk scene: the entity
+         composer drops entity-internal lights, so the navigation scene must
+         carry its light here or the viewer renders with the default
+         headlight (which fades, producing the "starts bright then dims"
+         artifact). -->
+    <light pos="1 0 3.5" dir="0 0 -1" directional="true" ambient="0.3 0.3 0.3" diffuse="1 1 1"/>
+    <body name="floor">
+      <geom name="floor" size="24.0 24.0 0.05" pos="0 0 -0.05" type="box" mass="1" material="groundplane"/>
+    </body>
+  </worldbody>
+  <keyframe>
+    <key name="stand"/>
+  </keyframe>
+</mujoco>

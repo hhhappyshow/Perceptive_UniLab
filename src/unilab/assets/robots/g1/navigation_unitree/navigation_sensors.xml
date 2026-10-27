@@ -1,0 +1,67 @@
+<mujoco model="g1 navigation cross-entity contact sensors">
+  <!-- Torso-subtree geoms vs. each obstacle box (InstinctMJ
+       ContactSensorCfg primary=subtree torso_link, secondary=box).
+       Names use the composed entity/local namespace. -->
+  <sensor>
+    <contact name="obstacle_contact_0_torso_found" geom1="robot/torso_collision" geom2="obstacle_0/obstacle_box_0_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_0_torso_force" geom1="robot/torso_collision" geom2="obstacle_0/obstacle_box_0_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_0_head_found" geom1="robot/head_collision" geom2="obstacle_0/obstacle_box_0_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_0_head_force" geom1="robot/head_collision" geom2="obstacle_0/obstacle_box_0_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_0_left_shoulder_yaw_found" geom1="robot/left_shoulder_yaw_collision" geom2="obstacle_0/obstacle_box_0_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_0_left_shoulder_yaw_force" geom1="robot/left_shoulder_yaw_collision" geom2="obstacle_0/obstacle_box_0_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_0_left_elbow_yaw_found" geom1="robot/left_elbow_yaw_collision" geom2="obstacle_0/obstacle_box_0_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_0_left_elbow_yaw_force" geom1="robot/left_elbow_yaw_collision" geom2="obstacle_0/obstacle_box_0_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_0_left_wrist_found" geom1="robot/left_wrist_collision" geom2="obstacle_0/obstacle_box_0_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_0_left_wrist_force" geom1="robot/left_wrist_collision" geom2="obstacle_0/obstacle_box_0_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_0_left_hand_found" geom1="robot/left_hand_collision" geom2="obstacle_0/obstacle_box_0_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_0_left_hand_force" geom1="robot/left_hand_collision" geom2="obstacle_0/obstacle_box_0_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_0_right_shoulder_yaw_found" geom1="robot/right_shoulder_yaw_collision" geom2="obstacle_0/obstacle_box_0_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_0_right_shoulder_yaw_force" geom1="robot/right_shoulder_yaw_collision" geom2="obstacle_0/obstacle_box_0_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_0_right_elbow_yaw_found" geom1="robot/right_elbow_yaw_collision" geom2="obstacle_0/obstacle_box_0_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_0_right_elbow_yaw_force" geom1="robot/right_elbow_yaw_collision" geom2="obstacle_0/obstacle_box_0_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_0_right_wrist_found" geom1="robot/right_wrist_collision" geom2="obstacle_0/obstacle_box_0_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_0_right_wrist_force" geom1="robot/right_wrist_collision" geom2="obstacle_0/obstacle_box_0_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_0_right_hand_found" geom1="robot/right_hand_collision" geom2="obstacle_0/obstacle_box_0_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_0_right_hand_force" geom1="robot/right_hand_collision" geom2="obstacle_0/obstacle_box_0_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_1_torso_found" geom1="robot/torso_collision" geom2="obstacle_1/obstacle_box_1_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_1_torso_force" geom1="robot/torso_collision" geom2="obstacle_1/obstacle_box_1_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_1_head_found" geom1="robot/head_collision" geom2="obstacle_1/obstacle_box_1_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_1_head_force" geom1="robot/head_collision" geom2="obstacle_1/obstacle_box_1_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_1_left_shoulder_yaw_found" geom1="robot/left_shoulder_yaw_collision" geom2="obstacle_1/obstacle_box_1_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_1_left_shoulder_yaw_force" geom1="robot/left_shoulder_yaw_collision" geom2="obstacle_1/obstacle_box_1_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_1_left_elbow_yaw_found" geom1="robot/left_elbow_yaw_collision" geom2="obstacle_1/obstacle_box_1_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_1_left_elbow_yaw_force" geom1="robot/left_elbow_yaw_collision" geom2="obstacle_1/obstacle_box_1_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_1_left_wrist_found" geom1="robot/left_wrist_collision" geom2="obstacle_1/obstacle_box_1_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_1_left_wrist_force" geom1="robot/left_wrist_collision" geom2="obstacle_1/obstacle_box_1_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_1_left_hand_found" geom1="robot/left_hand_collision" geom2="obstacle_1/obstacle_box_1_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_1_left_hand_force" geom1="robot/left_hand_collision" geom2="obstacle_1/obstacle_box_1_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_1_right_shoulder_yaw_found" geom1="robot/right_shoulder_yaw_collision" geom2="obstacle_1/obstacle_box_1_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_1_right_shoulder_yaw_force" geom1="robot/right_shoulder_yaw_collision" geom2="obstacle_1/obstacle_box_1_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_1_right_elbow_yaw_found" geom1="robot/right_elbow_yaw_collision" geom2="obstacle_1/obstacle_box_1_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_1_right_elbow_yaw_force" geom1="robot/right_elbow_yaw_collision" geom2="obstacle_1/obstacle_box_1_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_1_right_wrist_found" geom1="robot/right_wrist_collision" geom2="obstacle_1/obstacle_box_1_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_1_right_wrist_force" geom1="robot/right_wrist_collision" geom2="obstacle_1/obstacle_box_1_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_1_right_hand_found" geom1="robot/right_hand_collision" geom2="obstacle_1/obstacle_box_1_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_1_right_hand_force" geom1="robot/right_hand_collision" geom2="obstacle_1/obstacle_box_1_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_2_torso_found" geom1="robot/torso_collision" geom2="obstacle_2/obstacle_box_2_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_2_torso_force" geom1="robot/torso_collision" geom2="obstacle_2/obstacle_box_2_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_2_head_found" geom1="robot/head_collision" geom2="obstacle_2/obstacle_box_2_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_2_head_force" geom1="robot/head_collision" geom2="obstacle_2/obstacle_box_2_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_2_left_shoulder_yaw_found" geom1="robot/left_shoulder_yaw_collision" geom2="obstacle_2/obstacle_box_2_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_2_left_shoulder_yaw_force" geom1="robot/left_shoulder_yaw_collision" geom2="obstacle_2/obstacle_box_2_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_2_left_elbow_yaw_found" geom1="robot/left_elbow_yaw_collision" geom2="obstacle_2/obstacle_box_2_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_2_left_elbow_yaw_force" geom1="robot/left_elbow_yaw_collision" geom2="obstacle_2/obstacle_box_2_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_2_left_wrist_found" geom1="robot/left_wrist_collision" geom2="obstacle_2/obstacle_box_2_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_2_left_wrist_force" geom1="robot/left_wrist_collision" geom2="obstacle_2/obstacle_box_2_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_2_left_hand_found" geom1="robot/left_hand_collision" geom2="obstacle_2/obstacle_box_2_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_2_left_hand_force" geom1="robot/left_hand_collision" geom2="obstacle_2/obstacle_box_2_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_2_right_shoulder_yaw_found" geom1="robot/right_shoulder_yaw_collision" geom2="obstacle_2/obstacle_box_2_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_2_right_shoulder_yaw_force" geom1="robot/right_shoulder_yaw_collision" geom2="obstacle_2/obstacle_box_2_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_2_right_elbow_yaw_found" geom1="robot/right_elbow_yaw_collision" geom2="obstacle_2/obstacle_box_2_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_2_right_elbow_yaw_force" geom1="robot/right_elbow_yaw_collision" geom2="obstacle_2/obstacle_box_2_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_2_right_wrist_found" geom1="robot/right_wrist_collision" geom2="obstacle_2/obstacle_box_2_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_2_right_wrist_force" geom1="robot/right_wrist_collision" geom2="obstacle_2/obstacle_box_2_collision" data="force" reduce="netforce"/>
+    <contact name="obstacle_contact_2_right_hand_found" geom1="robot/right_hand_collision" geom2="obstacle_2/obstacle_box_2_collision" data="found" num="1"/>
+    <contact name="obstacle_contact_2_right_hand_force" geom1="robot/right_hand_collision" geom2="obstacle_2/obstacle_box_2_collision" data="force" reduce="netforce"/>
+  </sensor>
+</mujoco>

@@ -1,0 +1,14 @@
+<mujoco model="g1 navigation obstacle box 2">
+  <!-- Mocap obstacle box entity 2 (InstinctMJ box_spec(2)):
+       teleported by the navigation action term on reset. -->
+  <option integrator="implicitfast" timestep="0.005" solver="Newton" iterations="10" ls_iterations="20"/>
+  <worldbody>
+    <body name="obstacle_box_2" mocap="true" pos="7.0 0 0.3">
+      <geom name="obstacle_box_2_collision" type="box" size="0.25 0.3 0.3"
+        contype="1" conaffinity="1" group="0" rgba=".65 .25 .12 1"/>
+    </body>
+  </worldbody>
+  <keyframe>
+    <key name="stand"/>
+  </keyframe>
+</mujoco>

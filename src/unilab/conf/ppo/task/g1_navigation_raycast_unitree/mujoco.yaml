@@ -1,0 +1,28 @@
+# @package _global_
+# MuJoCo owner for the G1 navigation raycast task. Playback uses the InstinctMJ
+# trained high-level checkpoint (converted with
+# scripts/convert_instinct_navigation_checkpoint.py); teleop play works with
+# action_mode=zero because the keyboard command replaces the residual.
+defaults:
+  - /task/g1_navigation_raycast_unitree/base
+  - _self_
+
+training:
+  task_name: G1NavigationRayCastUnitree
+  sim_backend: mujoco
+algo:
+  num_envs: 1
+  # The converted InstinctMJ high-level checkpoint
+  # (scripts/convert_instinct_navigation_checkpoint.py) is an MLP
+  # 524 -> 256 -> 128 -> 128 -> 3 with an empirical observation normalizer.
+  actor:
+    hidden_dims: [256, 128, 128]
+    activation: elu
+    obs_normalization: true
+  obs_groups:
+    actor:
+      - policy
+play_profile:
+  enabled: true
+  env:
+    render_spacing: 12.0
