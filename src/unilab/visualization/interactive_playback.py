@@ -558,6 +558,7 @@ def create_rsl_rl_playback_session(
                             "iteration": False,
                             "rnd": False,
                         },
+                        map_location=device_name,
                     )
             policy = runner.get_inference_policy(device=device_name)
 
