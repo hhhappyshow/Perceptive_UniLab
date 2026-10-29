@@ -191,8 +191,10 @@ class NavigationAction(ActionTerm):
         """Per-frame playback overlay: goal marker and forward rays.
 
         Ports InstinctMJ's ``NavigationAction.debug_vis`` (goal sphere) and the
-        mjlab scanner ``show_rays`` visualization. Primitives are environment
-        local (the renderer applies grid offsets).
+        mjlab scanner ``show_rays`` visualization: only hit rays render, as a
+        short green line to their hit point plus a small endpoint dot; miss
+        rays draw nothing. Primitives are
+        environment local (the renderer applies grid offsets).
         """
         if not self.cfg.log_goal:
             return None
@@ -227,10 +229,11 @@ class NavigationAction(ActionTerm):
         device = self._device
         num_envs = self.num_envs
         show_rays = bool(self.cfg.show_rays)
-        ray_stride = 2  # 256 of 512 rays keeps the viewer under maxgeom
-        # mjlab RayCastSensor VizCfg colors: hit rays green, miss rays red.
+        ray_stride = 2  # hit lines for 256 of 512 rays keeps the viewer under maxgeom
+        # mjlab RayCastSensor VizCfg colors: hit rays green, endpoint dots cyan.
         hit_rgba = (0.0, 1.0, 0.0, 0.8)
-        miss_rgba = (1.0, 0.0, 0.0, 0.4)
+        dot_rgba = (0.0, 0.9, 1.0, 0.6)
+        dot_radius = 0.03
         max_distance = self._scan.ray_pattern.max_distance
 
         def _get_overlay():
@@ -258,17 +261,32 @@ class NavigationAction(ActionTerm):
                     ox, oy = origins_env[index, 0], origins_env[index, 1]
                     origins = ray_origins[index]
                     endpoints = ray_endpoints[index]
-                    for ray in range(0, origins.shape[0], ray_stride):
+                    for ray in range(origins.shape[0]):
                         start = origins[ray]
                         end = endpoints[ray]
                         hit = bool(np.linalg.norm(end - start) < max_distance - 1e-6)
-                        primitive = _line(
-                            (float(start[0] - ox), float(start[1] - oy), float(start[2])),
-                            (float(end[0] - ox), float(end[1] - oy), float(end[2])),
-                            hit_rgba if hit else miss_rgba,
+                        if not hit:
+                            continue
+                        per_env[index].append(
+                            DebugPrimitive(
+                                kind="sphere",
+                                pos=(
+                                    float(end[0] - ox),
+                                    float(end[1] - oy),
+                                    float(end[2]),
+                                ),
+                                size=(dot_radius,),
+                                rgba=dot_rgba,
+                            )
                         )
-                        if primitive is not None:
-                            per_env[index].append(primitive)
+                        if ray % ray_stride == 0:
+                            primitive = _line(
+                                (float(start[0] - ox), float(start[1] - oy), float(start[2])),
+                                (float(end[0] - ox), float(end[1] - oy), float(end[2])),
+                                hit_rgba,
+                            )
+                            if primitive is not None:
+                                per_env[index].append(primitive)
             return per_env
 
         return _get_overlay
