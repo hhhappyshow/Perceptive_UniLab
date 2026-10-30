@@ -1,0 +1,746 @@
+{
+  "run": {
+    "algo": "ppo",
+    "task": "G1NavigationRayCastUnitree",
+    "sim_backend": "mujoco",
+    "device": "cuda:2",
+    "configured_device": "cuda:2",
+    "collector_device": null,
+    "resolved_devices": {
+      "learner": {
+        "configured": "cuda:2",
+        "resolved": "cuda:2"
+      },
+      "collector_tensor": {
+        "configured": "auto",
+        "resolved": "cuda:2"
+      }
+    },
+    "log_dir": "/mnt/gfs/home/yudong/Perceptive_UniLab/logs/rsl_rl_ppo/G1NavigationRayCastUnitree/2026-10-28_06-56-07_mujoco",
+    "start_time_utc": "2026-10-28T06:56:07.195463+00:00",
+    "hostname": "lyg2245",
+    "user": "yudong",
+    "git": {
+      "commit": "9e8e12fedc744eb48fa81d7be8d55384b8274d77",
+      "branch": "perception",
+      "dirty": false
+    },
+    "hardware": {
+      "platform": "Linux-5.15.0-119-generic-x86_64-with-glibc2.35",
+      "chip": "Intel(R) Xeon(R) Platinum 8380 CPU @ 2.30GHz",
+      "cpu_total_cores": "80",
+      "cpu_performance_cores": "unknown",
+      "cpu_efficiency_cores": "unknown",
+      "gpu_name": "NVIDIA GeForce RTX 5090",
+      "memory": "1007.5 GB",
+      "gpu_memory": "32607 MiB"
+    },
+    "wandb": {
+      "project": "unilab",
+      "entity": null,
+      "name": "ppo__G1NavigationRayCastUnitree__2026-10-28_06-56-07_mujoco",
+      "group": "G1NavigationRayCastUnitree",
+      "job_type": "ppo",
+      "tags": [
+        "ppo",
+        "G1NavigationRayCastUnitree",
+        "mujoco",
+        "user-yudong"
+      ],
+      "notes": null,
+      "mode": null
+    },
+    "configured_seed": 1,
+    "configured_seed_source": "algo.seed",
+    "effective_seed": 1,
+    "tf32_matmul": {
+      "requested": "ieee",
+      "enabled": false,
+      "reason": "configured_ieee",
+      "applied": true
+    }
+  },
+  "config": {
+    "algo": {
+      "algo": "ppo",
+      "algo_log_name": "rsl_rl_ppo",
+      "seed": 1,
+      "num_envs": 256,
+      "num_steps_per_env": 24,
+      "max_iterations": 10000,
+      "save_interval": 100,
+      "obs_groups": {
+        "actor": [
+          "policy"
+        ]
+      },
+      "experiment_name": "test",
+      "run_name": "",
+      "resume": false,
+      "load_run": "-1",
+      "checkpoint": -1,
+      "resume_path": null,
+      "actor": {
+        "class_name": "rsl_rl.models.MLPModel",
+        "hidden_dims": [
+          256,
+          128,
+          128
+        ],
+        "activation": "elu",
+        "obs_normalization": true,
+        "distribution_cfg": {
+          "class_name": "rsl_rl.modules.distribution.GaussianDistribution",
+          "init_std": 1.0,
+          "std_type": "scalar"
+        }
+      },
+      "critic": {
+        "class_name": "rsl_rl.models.MLPModel",
+        "hidden_dims": [
+          512,
+          256,
+          128
+        ],
+        "activation": "elu",
+        "obs_normalization": false
+      },
+      "algorithm": {
+        "class_name": "rsl_rl.algorithms:PPO",
+        "value_loss_coef": 1.0,
+        "use_clipped_value_loss": true,
+        "clip_param": 0.2,
+        "entropy_coef": 0.01,
+        "num_learning_epochs": 5,
+        "num_mini_batches": 4,
+        "learning_rate": 0.001,
+        "schedule": "adaptive",
+        "gamma": 0.99,
+        "lam": 0.95,
+        "desired_kl": 0.01,
+        "max_grad_norm": 1.0
+      }
+    },
+    "training": {
+      "task_name": "G1NavigationRayCastUnitree",
+      "dp_collector_cpu_ids": null,
+      "device": "cuda:2",
+      "logger": "tensorboard",
+      "log_interval": 1,
+      "wandb_project": "unilab",
+      "wandb_entity": null,
+      "wandb_group": null,
+      "wandb_job_type": null,
+      "wandb_name": null,
+      "wandb_tags": [],
+      "wandb_notes": null,
+      "wandb_mode": null,
+      "sim_backend": "mujoco",
+      "collector_tensor_device": "auto",
+      "nan_guard": {
+        "enabled": true,
+        "buffer_size": 100,
+        "max_envs_to_dump": 5,
+        "output_dir": null
+      },
+      "play_only": false,
+      "no_play": false,
+      "tf32_matmul": "ieee",
+      "sim2sim_strict": true,
+      "play_render_mode": "auto",
+      "play_env_num": 16,
+      "render_spacing": 1.0,
+      "play_steps": 200,
+      "cam_distance": 6.0,
+      "cam_elevation": -20.0,
+      "cam_azimuth": 90.0,
+      "cam_lookat": null,
+      "cam_tracking": false,
+      "cam_tracking_env_idx": 0,
+      "cam_tracking_extra_envs": 2,
+      "log_root": null,
+      "num_timesteps": null,
+      "log_dir": null
+    },
+    "interactive": {
+      "action_mode": "zero",
+      "policy_obs_mode": "auto",
+      "sim2sim": true,
+      "show_target_bodies": false,
+      "show_reward_debug": false,
+      "target_show_axes": false,
+      "target_body_names": "",
+      "target_max_bodies": 0,
+      "target_marker_radius": 0.02,
+      "target_axis_length": 0.08,
+      "target_marker_alpha": 0.75,
+      "reward_debug_show_velocity": false,
+      "reward_debug_lin_vel_scale": 0.08,
+      "reward_debug_ang_vel_scale": 0.05,
+      "reward_debug_show_connectors": false,
+      "reward_debug_show_global_anchor": false,
+      "camera_follow_body": true,
+      "camera_focus_body_name": "",
+      "camera_height_offset": 0.15,
+      "camera_distance": null,
+      "camera_elevation": null,
+      "camera_azimuth": null,
+      "use_env_visual_model": true,
+      "speed": 1.0,
+      "start_paused": false,
+      "keyboard": false,
+      "keyboard_step_lin": 0.1,
+      "keyboard_step_ang": 0.2
+    },
+    "viser": {
+      "port": 8080,
+      "env_idx": 0,
+      "display_mode": "all",
+      "max_envs": 16
+    },
+    "env": {
+      "scene": {
+        "default_keyframe_name": "stand",
+        "primary_entity": "robot",
+        "entity_assets": [
+          {
+            "name": "floor",
+            "source": {
+              "model_file": "src/unilab/assets/robots/g1/navigation_unitree/floor_entity.xml"
+            },
+            "kind": "rigid",
+            "root_mode": "fixed"
+          },
+          {
+            "name": "robot",
+            "source": {
+              "model_file": "src/unilab/assets/robots/g1/navigation_unitree/g1.xml"
+            },
+            "root_mode": "floating",
+            "initial_state": {
+              "position": [
+                0.0,
+                0.0,
+                0.8
+              ],
+              "quaternion": [
+                1.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "name": "obstacle_0",
+            "source": {
+              "model_file": "src/unilab/assets/robots/g1/navigation_unitree/obstacle_box_entity_0.xml"
+            },
+            "root_mode": "kinematic"
+          },
+          {
+            "name": "obstacle_1",
+            "source": {
+              "model_file": "src/unilab/assets/robots/g1/navigation_unitree/obstacle_box_entity_1.xml"
+            },
+            "root_mode": "kinematic"
+          },
+          {
+            "name": "obstacle_2",
+            "source": {
+              "model_file": "src/unilab/assets/robots/g1/navigation_unitree/obstacle_box_entity_2.xml"
+            },
+            "root_mode": "kinematic"
+          }
+        ],
+        "fragment_files": [
+          "src/unilab/assets/robots/g1/navigation_unitree/navigation_sensors.xml"
+        ],
+        "entities": {
+          "floor": {
+            "physical_entity": "floor",
+            "root_body_name": "floor/floor",
+            "body_names": [
+              "floor/floor"
+            ]
+          },
+          "robot": {
+            "root_body_name": "robot/pelvis",
+            "physical_entity": "robot",
+            "joint_names": [
+              "robot/left_hip_pitch_joint",
+              "robot/left_hip_roll_joint",
+              "robot/left_hip_yaw_joint",
+              "robot/left_knee_joint",
+              "robot/left_ankle_pitch_joint",
+              "robot/left_ankle_roll_joint",
+              "robot/right_hip_pitch_joint",
+              "robot/right_hip_roll_joint",
+              "robot/right_hip_yaw_joint",
+              "robot/right_knee_joint",
+              "robot/right_ankle_pitch_joint",
+              "robot/right_ankle_roll_joint",
+              "robot/waist_yaw_joint",
+              "robot/waist_roll_joint",
+              "robot/waist_pitch_joint",
+              "robot/left_shoulder_pitch_joint",
+              "robot/left_shoulder_roll_joint",
+              "robot/left_shoulder_yaw_joint",
+              "robot/left_elbow_joint",
+              "robot/left_wrist_roll_joint",
+              "robot/left_wrist_pitch_joint",
+              "robot/left_wrist_yaw_joint",
+              "robot/right_shoulder_pitch_joint",
+              "robot/right_shoulder_roll_joint",
+              "robot/right_shoulder_yaw_joint",
+              "robot/right_elbow_joint",
+              "robot/right_wrist_roll_joint",
+              "robot/right_wrist_pitch_joint",
+              "robot/right_wrist_yaw_joint"
+            ],
+            "actuator_names": [
+              "robot/left_hip_pitch_joint",
+              "robot/left_hip_roll_joint",
+              "robot/left_hip_yaw_joint",
+              "robot/left_knee_joint",
+              "robot/left_ankle_pitch_joint",
+              "robot/left_ankle_roll_joint",
+              "robot/right_hip_pitch_joint",
+              "robot/right_hip_roll_joint",
+              "robot/right_hip_yaw_joint",
+              "robot/right_knee_joint",
+              "robot/right_ankle_pitch_joint",
+              "robot/right_ankle_roll_joint",
+              "robot/waist_yaw_joint",
+              "robot/waist_roll_joint",
+              "robot/waist_pitch_joint",
+              "robot/left_shoulder_pitch_joint",
+              "robot/left_shoulder_roll_joint",
+              "robot/left_shoulder_yaw_joint",
+              "robot/left_elbow_joint",
+              "robot/left_wrist_roll_joint",
+              "robot/left_wrist_pitch_joint",
+              "robot/left_wrist_yaw_joint",
+              "robot/right_shoulder_pitch_joint",
+              "robot/right_shoulder_roll_joint",
+              "robot/right_shoulder_yaw_joint",
+              "robot/right_elbow_joint",
+              "robot/right_wrist_roll_joint",
+              "robot/right_wrist_pitch_joint",
+              "robot/right_wrist_yaw_joint"
+            ],
+            "body_names": [
+              "robot/pelvis",
+              "robot/left_hip_pitch_link",
+              "robot/left_hip_roll_link",
+              "robot/left_hip_yaw_link",
+              "robot/left_knee_link",
+              "robot/left_ankle_pitch_link",
+              "robot/left_ankle_roll_link",
+              "robot/right_hip_pitch_link",
+              "robot/right_hip_roll_link",
+              "robot/right_hip_yaw_link",
+              "robot/right_knee_link",
+              "robot/right_ankle_pitch_link",
+              "robot/right_ankle_roll_link",
+              "robot/waist_yaw_link",
+              "robot/waist_roll_link",
+              "robot/torso_link",
+              "robot/left_shoulder_pitch_link",
+              "robot/left_shoulder_roll_link",
+              "robot/left_shoulder_yaw_link",
+              "robot/left_elbow_link",
+              "robot/left_wrist_roll_link",
+              "robot/left_wrist_pitch_link",
+              "robot/left_wrist_yaw_link",
+              "robot/right_shoulder_pitch_link",
+              "robot/right_shoulder_roll_link",
+              "robot/right_shoulder_yaw_link",
+              "robot/right_elbow_link",
+              "robot/right_wrist_roll_link",
+              "robot/right_wrist_pitch_link",
+              "robot/right_wrist_yaw_link"
+            ]
+          },
+          "obstacle_0": {
+            "physical_entity": "obstacle_0",
+            "root_body_name": "obstacle_0/obstacle_box_0",
+            "body_names": [
+              "obstacle_0/obstacle_box_0"
+            ]
+          },
+          "obstacle_1": {
+            "physical_entity": "obstacle_1",
+            "root_body_name": "obstacle_1/obstacle_box_1",
+            "body_names": [
+              "obstacle_1/obstacle_box_1"
+            ]
+          },
+          "obstacle_2": {
+            "physical_entity": "obstacle_2",
+            "root_body_name": "obstacle_2/obstacle_box_2",
+            "body_names": [
+              "obstacle_2/obstacle_box_2"
+            ]
+          }
+        }
+      },
+      "sim_dt": 0.005,
+      "ctrl_dt": 0.02,
+      "max_episode_seconds": 20.0,
+      "observations": {
+        "policy": {
+          "enable_corruption": false,
+          "terms": {
+            "goal": {
+              "func": "unilab.tasks.navigation.mdp.goal"
+            },
+            "base_ang_vel": {
+              "func": "unilab.tasks.navigation.mdp.base_ang_vel_body"
+            },
+            "projected_gravity": {
+              "func": "unilab.tasks.navigation.mdp.projected_gravity_body"
+            },
+            "previous_action": {
+              "func": "unilab.envs.mdp.last_action",
+              "params": {
+                "action_name": "navigation"
+              }
+            },
+            "forward_scan": {
+              "func": "unilab.tasks.navigation.ray_observation.NormalizedRayScan",
+              "params": {
+                "ray_pattern": {
+                  "_target_": "unilab.envs.mdp.ray_observation.RayPatternCfg",
+                  "entity_name": "robot",
+                  "max_distance": 3.0,
+                  "attachment_body_name": "robot/torso_link",
+                  "alignment": "yaw",
+                  "caster": "uni_ray",
+                  "allowed_geom_names": [
+                    "floor/floor",
+                    "obstacle_0/obstacle_box_0_collision",
+                    "obstacle_1/obstacle_box_1_collision",
+                    "obstacle_2/obstacle_box_2_collision"
+                  ],
+                  "pattern": {
+                    "_target_": "unilab.envs.mdp.ray_observation.RayCameraPatternCfg",
+                    "width": 32,
+                    "height": 16,
+                    "fovy": 45.0,
+                    "forward": [
+                      0.9659258262890683,
+                      0.0,
+                      -0.25881904510252074
+                    ],
+                    "up": [
+                      0.25881904510252074,
+                      0.0,
+                      0.9659258262890683
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "critic": {
+          "terms": {
+            "goal": {
+              "func": "unilab.tasks.navigation.mdp.goal"
+            },
+            "base_ang_vel": {
+              "func": "unilab.tasks.navigation.mdp.base_ang_vel_body"
+            },
+            "projected_gravity": {
+              "func": "unilab.tasks.navigation.mdp.projected_gravity_body"
+            },
+            "previous_action": {
+              "func": "unilab.envs.mdp.last_action",
+              "params": {
+                "action_name": "navigation"
+              }
+            },
+            "forward_scan": {
+              "func": "unilab.tasks.navigation.ray_observation.NormalizedRayScan",
+              "params": {
+                "ray_pattern": {
+                  "_target_": "unilab.envs.mdp.ray_observation.RayPatternCfg",
+                  "entity_name": "robot",
+                  "max_distance": 3.0,
+                  "attachment_body_name": "robot/torso_link",
+                  "alignment": "yaw",
+                  "caster": "uni_ray",
+                  "allowed_geom_names": [
+                    "floor/floor",
+                    "obstacle_0/obstacle_box_0_collision",
+                    "obstacle_1/obstacle_box_1_collision",
+                    "obstacle_2/obstacle_box_2_collision"
+                  ],
+                  "pattern": {
+                    "_target_": "unilab.envs.mdp.ray_observation.RayCameraPatternCfg",
+                    "width": 32,
+                    "height": 16,
+                    "fovy": 45.0,
+                    "forward": [
+                      0.9659258262890683,
+                      0.0,
+                      -0.25881904510252074
+                    ],
+                    "up": [
+                      0.25881904510252074,
+                      0.0,
+                      0.9659258262890683
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "actions": {
+        "navigation": {
+          "_target_": "unilab.tasks.navigation.manager_terms.NavigationActionCfg",
+          "entity_name": "robot",
+          "stage": 1,
+          "checkpoint": "",
+          "backend": "unitree_onnx",
+          "teleop": false,
+          "log_goal": false,
+          "show_rays": false,
+          "high_level_every": 5
+        }
+      },
+      "commands": {},
+      "events": {
+        "reset_robot_to_stand": {
+          "func": "unilab.tasks.navigation.mdp.reset_robot_to_stand",
+          "mode": "reset"
+        }
+      },
+      "terminations": {
+        "success": {
+          "func": "unilab.tasks.navigation.mdp.navigation_outcome",
+          "params": {
+            "kind": "success"
+          }
+        },
+        "collision": {
+          "func": "unilab.tasks.navigation.mdp.navigation_outcome",
+          "params": {
+            "kind": "collision"
+          }
+        },
+        "fall": {
+          "func": "unilab.tasks.navigation.mdp.navigation_outcome",
+          "params": {
+            "kind": "fall"
+          }
+        },
+        "time_out": {
+          "func": "unilab.envs.mdp.time_out",
+          "time_out": true
+        }
+      },
+      "policy_observation_group": "policy",
+      "critic_observation_group": "critic"
+    },
+    "reward": {
+      "progress": {
+        "func": "unilab.tasks.navigation.mdp.navigation_reward",
+        "weight": 2.0,
+        "params": {
+          "kind": "progress"
+        }
+      },
+      "success": {
+        "func": "unilab.tasks.navigation.mdp.navigation_reward",
+        "weight": 10.0,
+        "params": {
+          "kind": "success"
+        }
+      },
+      "collision": {
+        "func": "unilab.tasks.navigation.mdp.navigation_reward",
+        "weight": -10.0,
+        "params": {
+          "kind": "collision"
+        }
+      },
+      "fall": {
+        "func": "unilab.tasks.navigation.mdp.navigation_reward",
+        "weight": -10.0,
+        "params": {
+          "kind": "fall"
+        }
+      },
+      "time": {
+        "func": "unilab.tasks.navigation.mdp.navigation_reward",
+        "weight": -0.1,
+        "params": {
+          "kind": "time"
+        }
+      },
+      "smoothness": {
+        "func": "unilab.tasks.navigation.mdp.navigation_reward",
+        "weight": -0.05,
+        "params": {
+          "kind": "smoothness"
+        }
+      }
+    },
+    "play_profile": {
+      "enabled": true,
+      "env": {
+        "render_spacing": 12.0
+      }
+    }
+  },
+  "contract_snapshot": {
+    "algo.obs_groups": {
+      "actor": [
+        "policy"
+      ]
+    },
+    "env.observations": {
+      "policy": {
+        "enable_corruption": false,
+        "terms": {
+          "goal": {
+            "func": "unilab.tasks.navigation.mdp.goal"
+          },
+          "base_ang_vel": {
+            "func": "unilab.tasks.navigation.mdp.base_ang_vel_body"
+          },
+          "projected_gravity": {
+            "func": "unilab.tasks.navigation.mdp.projected_gravity_body"
+          },
+          "previous_action": {
+            "func": "unilab.envs.mdp.last_action",
+            "params": {
+              "action_name": "navigation"
+            }
+          },
+          "forward_scan": {
+            "func": "unilab.tasks.navigation.ray_observation.NormalizedRayScan",
+            "params": {
+              "ray_pattern": {
+                "_target_": "unilab.envs.mdp.ray_observation.RayPatternCfg",
+                "entity_name": "robot",
+                "max_distance": 3.0,
+                "attachment_body_name": "robot/torso_link",
+                "alignment": "yaw",
+                "caster": "uni_ray",
+                "allowed_geom_names": [
+                  "floor/floor",
+                  "obstacle_0/obstacle_box_0_collision",
+                  "obstacle_1/obstacle_box_1_collision",
+                  "obstacle_2/obstacle_box_2_collision"
+                ],
+                "pattern": {
+                  "_target_": "unilab.envs.mdp.ray_observation.RayCameraPatternCfg",
+                  "width": 32,
+                  "height": 16,
+                  "fovy": 45.0,
+                  "forward": [
+                    0.9659258262890683,
+                    0.0,
+                    -0.25881904510252074
+                  ],
+                  "up": [
+                    0.25881904510252074,
+                    0.0,
+                    0.9659258262890683
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "critic": {
+        "terms": {
+          "goal": {
+            "func": "unilab.tasks.navigation.mdp.goal"
+          },
+          "base_ang_vel": {
+            "func": "unilab.tasks.navigation.mdp.base_ang_vel_body"
+          },
+          "projected_gravity": {
+            "func": "unilab.tasks.navigation.mdp.projected_gravity_body"
+          },
+          "previous_action": {
+            "func": "unilab.envs.mdp.last_action",
+            "params": {
+              "action_name": "navigation"
+            }
+          },
+          "forward_scan": {
+            "func": "unilab.tasks.navigation.ray_observation.NormalizedRayScan",
+            "params": {
+              "ray_pattern": {
+                "_target_": "unilab.envs.mdp.ray_observation.RayPatternCfg",
+                "entity_name": "robot",
+                "max_distance": 3.0,
+                "attachment_body_name": "robot/torso_link",
+                "alignment": "yaw",
+                "caster": "uni_ray",
+                "allowed_geom_names": [
+                  "floor/floor",
+                  "obstacle_0/obstacle_box_0_collision",
+                  "obstacle_1/obstacle_box_1_collision",
+                  "obstacle_2/obstacle_box_2_collision"
+                ],
+                "pattern": {
+                  "_target_": "unilab.envs.mdp.ray_observation.RayCameraPatternCfg",
+                  "width": 32,
+                  "height": 16,
+                  "fovy": 45.0,
+                  "forward": [
+                    0.9659258262890683,
+                    0.0,
+                    -0.25881904510252074
+                  ],
+                  "up": [
+                    0.25881904510252074,
+                    0.0,
+                    0.9659258262890683
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "env.actions": {
+      "navigation": {
+        "_target_": "unilab.tasks.navigation.manager_terms.NavigationActionCfg",
+        "entity_name": "robot",
+        "stage": 1,
+        "checkpoint": "",
+        "backend": "unitree_onnx",
+        "teleop": false,
+        "log_goal": false,
+        "show_rays": false,
+        "high_level_every": 5
+      }
+    },
+    "env.policy_observation_group": "policy",
+    "env.critic_observation_group": "critic",
+    "algo.actor.hidden_dims": [
+      256,
+      128,
+      128
+    ],
+    "algo.critic.hidden_dims": [
+      512,
+      256,
+      128
+    ],
+    "algo.actor.obs_normalization": true,
+    "algo.critic.obs_normalization": false,
+    "env.ctrl_dt": 0.02
+  }
+}
