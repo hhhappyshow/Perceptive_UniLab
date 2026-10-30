@@ -269,7 +269,7 @@ class TorchEnv(ABEnv):
         # previous one before the backend call so unsupported or failed steps
         # cannot expose stale completion metadata.
         self._state.info.pop("completion", None)
-        backend_result = self._backend.step_tensor(ctrl, self._cfg.sim_substeps)
+        backend_result = self.advance_physics(ctrl)
         step_core_ms = (time.perf_counter() - phase) * 1000.0
         step_core_cpu_ms = (_cpu_time() - phase_cpu) * 1000.0
         if isinstance(backend_result, dict):
@@ -368,6 +368,16 @@ class TorchEnv(ABEnv):
             if completion is not None:
                 self._state.info["completion"] = completion
         return self._state
+
+    def advance_physics(self, ctrl: torch.Tensor) -> dict | None:
+        """Advance one control interval with an already validated control.
+
+        Owners may observe intermediate physics steps through public backend
+        APIs. They must advance exactly sim_substeps, retain this control, and
+        leave rewards, episode counters and resets to the outer step lifecycle.
+        A returned completion receipt must cover the entire control interval.
+        """
+        return self._backend.step_tensor(ctrl, self._cfg.sim_substeps)
 
     def _validate_action(self, actions: torch.Tensor) -> None:
         self._validate_action_contract(actions)

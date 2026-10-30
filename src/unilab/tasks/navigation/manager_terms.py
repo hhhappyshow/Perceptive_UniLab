@@ -1,11 +1,9 @@
-"""Two-rate residual navigation action for UniLab (InstinctMJ port).
+"""Residual navigation action for UniLab (InstinctMJ port).
 
-The high-level residual policy decides a velocity command at 10 Hz; the frozen
-official unitree ONNX locomotion policy tracks it at 50 Hz. UniLab applies one
-control per env step, so the port runs the env at 50 Hz (sim_dt 0.005,
-ctrl_dt 0.02) and the action term consumes the high-level action only every
-``high_level_every`` steps (default 5 -> 0.1 s), matching InstinctMJ's two-rate
-decimation exactly.
+The residual policy and frozen official unitree ONNX locomotion policy both
+update at 50 Hz (sim_dt 0.005, ctrl_dt 0.02). Every PPO transition executes its
+action. This deliberately differs from InstinctMJ's 10 Hz residual policy:
+dropping intermediate PPO actions does not implement two-rate decimation.
 
 Keyboard teleop (Instinct ``--teleop`` semantics adapted to UniLab commander
 channels): arrows nudge ``[vx, vy, vyaw]`` increments, Enter zeroes the
@@ -39,6 +37,7 @@ from unilab.tasks.navigation.low_level import (
     OFFICIAL_JOINT_ORDER,
     UnitreeOnnxLocomotion,
 )
+from unilab.tasks.navigation.mdp import OBSTACLE_CONTACT_SENSORS, read_obstacle_contacts
 from unilab.tasks.navigation.ray_observation import (
     NormalizedRayScan,
     clearer_side_speed,
@@ -54,12 +53,10 @@ if TYPE_CHECKING:
 _GLF_KEY_ENTER = 257
 _GLF_KEY_RIGHT, _GLF_KEY_LEFT, _GLF_KEY_DOWN, _GLF_KEY_UP = 262, 263, 264, 265
 
-_HIGH_LEVEL_PERIOD = 0.1  # seconds; the cadence the residual policy trained on
-
 
 @dataclass(kw_only=True)
 class NavigationActionCfg(ActionTermCfg):
-    """Configuration for the two-rate residual navigation action term."""
+    """Configuration for the residual navigation action term."""
 
     stage: int = 1
     checkpoint: str = ""
@@ -67,7 +64,6 @@ class NavigationActionCfg(ActionTermCfg):
     teleop: bool = False
     log_goal: bool = False
     show_rays: bool = False
-    high_level_every: int = 5
 
     def build(self, env: ManagerBasedRlEnv) -> "NavigationAction":
         return NavigationAction(self, env)
@@ -83,8 +79,7 @@ class NavigationAction(ActionTerm):
         self._device = torch.device(env.device)
         if cfg.backend != "unitree_onnx":
             raise ValueError(
-                "UniLab navigation port supports backend='unitree_onnx' only; "
-                f"got {cfg.backend!r}"
+                f"UniLab navigation port supports backend='unitree_onnx' only; got {cfg.backend!r}"
             )
         self.policy = UnitreeOnnxLocomotion(cfg.checkpoint or None, device=str(self._device))
         entity = self._entity
@@ -126,23 +121,12 @@ class NavigationAction(ActionTerm):
         if tuple(name.split("/", 1)[-1] for name in self.low.target_names) != OFFICIAL_JOINT_ORDER:
             raise ValueError("Low-level joint targets are not in official ONNX order")
 
-        if not isinstance(cfg.high_level_every, int) or cfg.high_level_every < 1:
-            raise ValueError("high_level_every must be a positive integer")
-        high_level_dt = env.step_dt * cfg.high_level_every
-        if abs(high_level_dt - _HIGH_LEVEL_PERIOD) > 1e-6:
-            raise ValueError(
-                "high_level_every * ctrl_dt must equal the 0.1 s residual cadence; "
-                f"got {high_level_dt} s"
-            )
         if abs(self.policy.control_dt - env.step_dt) > 1e-9:
             raise ValueError(
                 "The official low-level policy requires a 0.02 s control step; "
                 f"env ctrl_dt is {env.step_dt}"
             )
-        self.high_level_every = cfg.high_level_every
-        self.high_level_boundary = False
         self.stage = cfg.stage
-        self._high_level_counter = 0
         self.reward_step = -1
 
         num_envs = env.num_envs
@@ -153,14 +137,16 @@ class NavigationAction(ActionTerm):
         self.low_time = torch.zeros(num_envs, device=self._device)
         self.best_distance = torch.zeros(num_envs, device=self._device)
         self.progress = torch.zeros(num_envs, device=self._device)
-        self.interval_progress = torch.zeros(num_envs, device=self._device)
         # Goal direction/distance planned by place_obstacles (reset event).
         self._planned_angle = torch.zeros(num_envs, device=self._device)
         self._planned_distance = torch.zeros(num_envs, device=self._device)
         self.forward_blocked = torch.zeros(num_envs, dtype=torch.bool, device=self._device)
+        self.obstacle_contact = torch.zeros(num_envs, dtype=torch.bool, device=self._device)
 
         self._scan = NormalizedRayScan(
-            ManagerTermBaseCfg(func=NormalizedRayScan, params={"ray_pattern": make_forward_scan_pattern()}),
+            ManagerTermBaseCfg(
+                func=NormalizedRayScan, params={"ray_pattern": make_forward_scan_pattern()}
+            ),
             env,
         )
 
@@ -202,6 +188,7 @@ class NavigationAction(ActionTerm):
 
         import numpy as np
         from unisim.backend.base import DebugPrimitive
+
         from unilab.visualization.debug_primitives import quat_from_z_axis
 
         @dataclass
@@ -255,7 +242,11 @@ class NavigationAction(ActionTerm):
                         rgba=(1.0, 0.15, 0.1, 0.9),
                     )
                 )
-            if show_rays and getattr(self._env.scene, "read_plan", None) is not None and self._env.scene.read_plan.ready:
+            if (
+                show_rays
+                and getattr(self._env.scene, "read_plan", None) is not None
+                and self._env.scene.read_plan.ready
+            ):
                 ray_origins, ray_endpoints = self._scan.ray_debug(self._env)
                 for index in range(num_envs):
                     ox, oy = origins_env[index, 0], origins_env[index, 1]
@@ -296,6 +287,10 @@ class NavigationAction(ActionTerm):
     @property
     def tensor_body_names(self) -> tuple[str, ...]:
         return ("robot/pelvis",)
+
+    @property
+    def tensor_sensor_names(self) -> tuple[str, ...]:
+        return OBSTACLE_CONTACT_SENSORS
 
     @property
     def raw_action(self) -> torch.Tensor:
@@ -374,7 +369,7 @@ class NavigationAction(ActionTerm):
     # -- action lifecycle ----------------------------------------------------
 
     def _high_level_command(self, actions: torch.Tensor) -> torch.Tensor:
-        """Velocity command for one 0.1 s interval, from goal or teleop."""
+        """Velocity command for this control step, from goal or teleop."""
         command = self._teleop_state()
         if command is None:
             goal = self.relative_goal()
@@ -389,12 +384,9 @@ class NavigationAction(ActionTerm):
         return self.policy.command(nominal, torch.zeros_like(nominal))
 
     def process_actions(self, actions: torch.Tensor) -> None:
+        self.obstacle_contact.zero_()
         self._raw.copy_(actions)
-        boundary = self._high_level_counter % self.high_level_every == 0
-        self.high_level_boundary = boundary
-        self._high_level_counter += 1
-        if boundary:
-            self.velocity.copy_(self._high_level_command(actions))
+        self.velocity.copy_(self._high_level_command(actions))
         command = self._teleop_state()
         if command is not None:
             # The rule layer runs every 50 Hz step while teleoping.
@@ -412,7 +404,7 @@ class NavigationAction(ActionTerm):
         read_plan = self._env.scene.read_plan
         joint = read_plan.joint_tensor_view(self._entity)
         body = read_plan.body_tensor_view(self._entity, ("robot/pelvis",))
-        pos_w, quat_w = body.pos_w[:, 0, :], body.quat_w[:, 0, :]
+        quat_w = body.quat_w[:, 0, :]
         ang_vel_b = world_to_body_vector(quat_w, body.ang_vel_w[:, 0, :])
         gravity = self._entity.data.gravity_vec_w(self._device)
         if gravity.ndim == 1:
@@ -474,9 +466,7 @@ class NavigationAction(ActionTerm):
             pose[:, 1] = origin[:, 1] + along * angle.sin() + lateral * angle.cos()
             pose[:, 2] = heights[index] / 2
             active = (
-                torch.ones_like(choice, dtype=torch.bool)
-                if self.stage == 3
-                else choice == index
+                torch.ones_like(choice, dtype=torch.bool) if self.stage == 3 else choice == index
             )
             if self.stage == 0:
                 active[:] = False
@@ -494,7 +484,7 @@ class NavigationAction(ActionTerm):
         self.low_time[ids] = 0
         self.best_distance[ids] = 0
         self.progress[ids] = 0
-        self.interval_progress[ids] = 0
+        self.obstacle_contact[ids] = False
         self.low.reset(ids)
         if isinstance(ids, slice):
             rows = torch.arange(self.num_envs, device=self._device)
@@ -502,7 +492,6 @@ class NavigationAction(ActionTerm):
             rows = torch.as_tensor(ids, device=self._device).reshape(-1)
         count = rows.numel()
         if count == 0:
-            self._high_level_counter = 0
             return
         device = self._device
         origin = self._env.scene.env_origins(device).index_select(0, rows)
@@ -523,7 +512,6 @@ class NavigationAction(ActionTerm):
                     f"goal: x={float(goal[0]):+.3f} y={float(goal[1]):+.3f} "
                     f"z={float(goal[2]):+.3f} distance={float(goal_distance):.3f}"
                 )
-        self._high_level_counter = 0
 
 
 class NavigationManagerBasedEnv(_ConcreteManagerBasedRlEnv):
@@ -531,12 +519,36 @@ class NavigationManagerBasedEnv(_ConcreteManagerBasedRlEnv):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.backend.backend_type != "mujoco" or self.produces_completion_receipts:
+            raise NotImplementedError("Navigation contact sampling requires synchronous MuJoCo")
         self.action_manager.get_term("navigation").bind_mocap_bodies()
+
+    def advance_physics(self, ctrl: torch.Tensor) -> dict | None:
+        """Latch even transient contacts while holding the policy control fixed.
+
+        See ADR-0022. A control interval still produces one PPO transition and
+        one reset boundary; no subsequent substep can erase an earlier contact.
+        """
+        term = self.action_manager.get_term("navigation")
+        read_plan = self.scene.read_plan
+        assert read_plan is not None
+        timing: dict[str, float] = {}
+        for _ in range(self.cfg.sim_substeps):
+            result = self.backend.step_tensor(ctrl, 1)
+            if result is not None:
+                for name, value in result.get("timing", {}).items():
+                    timing[name] = timing.get(name, 0.0) + value
+            read_plan.invalidate()
+            read_plan.refresh()
+            term.obstacle_contact.logical_or_(read_obstacle_contacts(self))
+        return {"timing": timing}
 
     def get_playback_debug_overlays(self):
         """Include action-term overlays (the base aggregates command terms only)."""
         for name in self.action_manager.active_terms:
-            provider = getattr(self.action_manager.get_term(name), "playback_debug_overlay_getter", None)
+            provider = getattr(
+                self.action_manager.get_term(name), "playback_debug_overlay_getter", None
+            )
             if provider is not None:
                 getter = provider()
                 if getter is not None:
@@ -577,9 +589,13 @@ def make_navigation_env(
             f"make_navigation_env expected ManagerBasedRlEnvCfg, received {type(cfg).__name__}"
         )
     if isinstance(num_envs, bool) or not isinstance(num_envs, int) or num_envs <= 0:
-        raise ValueError(f"make_navigation_env num_envs must be a positive integer, got {num_envs!r}")
+        raise ValueError(
+            f"make_navigation_env num_envs must be a positive integer, got {num_envs!r}"
+        )
     if not isinstance(backend_type, str) or not backend_type:
-        raise ValueError(f"make_navigation_env backend_type must be a non-empty string, got {backend_type!r}")
+        raise ValueError(
+            f"make_navigation_env backend_type must be a non-empty string, got {backend_type!r}"
+        )
 
     cfg.validate()
     assert cfg.scene is not None

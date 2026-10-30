@@ -2,10 +2,9 @@
 
 Every tensor read is declared through ``tensor_body_names`` /
 ``tensor_sensor_names`` so the packed read plan serves the terms without
-backend-specific access. Reward values reproduce InstinctMJ's per-0.1 s
-quantities on high-level boundary steps and emit zero elsewhere; with
-``scale_rewards_by_dt=True`` and a 0.02 s step this keeps per-interval reward
-totals identical to the 10 Hz training contract.
+backend-specific access. Progress and terminal rewards are impulses divided
+by step_dt before the reward manager applies dt. They are evaluated every
+control step, so an immediate reset cannot discard a reward between updates.
 """
 
 from __future__ import annotations
@@ -21,7 +20,30 @@ from unilab.managers.manager_base import ManagerTermBase, ManagerTermBaseCfg
 if TYPE_CHECKING:
     from unilab.managers.types import ManagerBasedRlEnv
 
-_TORSO_SUBTREE_GEOMS = (
+ROBOT_COLLISION_GEOMS = (
+    "pelvis",
+    "left_hip",
+    "left_thigh",
+    "left_shin",
+    "left_linkage_brace",
+    "right_hip",
+    "right_thigh",
+    "right_shin",
+    "right_linkage_brace",
+    "left_foot1",
+    "left_foot2",
+    "left_foot3",
+    "left_foot4",
+    "left_foot5",
+    "left_foot6",
+    "left_foot7",
+    "right_foot1",
+    "right_foot2",
+    "right_foot3",
+    "right_foot4",
+    "right_foot5",
+    "right_foot6",
+    "right_foot7",
     "torso",
     "head",
     "left_shoulder_yaw",
@@ -33,17 +55,32 @@ _TORSO_SUBTREE_GEOMS = (
     "right_wrist",
     "right_hand",
 )
-_OBSTACLE_CONTACT_SENSORS = tuple(
+OBSTACLE_CONTACT_SENSORS = tuple(
     f"obstacle_contact_{index}_{geom}_{field}"
     for index in range(3)
-    for geom in _TORSO_SUBTREE_GEOMS
+    for geom in ROBOT_COLLISION_GEOMS
     for field in ("found", "force")
 )
-_BOUNDARY_VALUE_SCALE = 5.0  # 0.1 s trained interval / 0.02 s env step
+_REFERENCE_STEP_DT = 0.1  # InstinctMJ's action-difference reward reference interval.
 
 
 def controller(env: ManagerBasedRlEnv):
     return env.action_manager.get_term("navigation")
+
+
+def read_obstacle_contacts(env: ManagerBasedRlEnv) -> torch.Tensor:
+    """Read this physics sample; the navigation env accumulates it per row."""
+    values = env.scene.read_plan.sensor_tensor_views(
+        env.scene["robot"], OBSTACLE_CONTACT_SENSORS
+    ).values
+    hit = torch.zeros(env.num_envs, dtype=torch.bool, device=env.device)
+    for index in range(3):
+        for geom in ROBOT_COLLISION_GEOMS:
+            found = values[f"obstacle_contact_{index}_{geom}_found"]
+            force = values[f"obstacle_contact_{index}_{geom}_force"]
+            hit |= (found.reshape(env.num_envs, -1) > 0.5).any(-1)
+            hit |= force.reshape(env.num_envs, -1).norm(dim=-1) > 1e-6
+    return hit
 
 
 def _cold_probe(env: ManagerBasedRlEnv, width: int, *, dtype: torch.dtype = torch.float32):
@@ -101,25 +138,7 @@ class navigation_outcome(ManagerTermBase):
 
     @property
     def tensor_sensor_names(self) -> tuple[str, ...]:
-        return _OBSTACLE_CONTACT_SENSORS
-
-    def _collision(self, env: ManagerBasedRlEnv) -> torch.Tensor:
-        read_plan = env.scene.read_plan
-        values = read_plan.sensor_tensor_views(
-            env.scene["robot"], _OBSTACLE_CONTACT_SENSORS
-        ).values
-        hits = []
-        for index in range(3):
-            found_any = None
-            force_any = None
-            for geom in _TORSO_SUBTREE_GEOMS:
-                found = values[f"obstacle_contact_{index}_{geom}_found"] > 0.5
-                force = values[f"obstacle_contact_{index}_{geom}_force"]
-                recent = force.reshape(env.num_envs, -1).norm(dim=-1) > 1e-6
-                found_any = found if found_any is None else (found_any | found)
-                force_any = recent if force_any is None else (force_any | recent)
-            hits.append(found_any.reshape(env.num_envs, -1).any(-1) | force_any)
-        return torch.stack(hits).any(0)
+        return OBSTACLE_CONTACT_SENSORS
 
     def _fall(self, env: ManagerBasedRlEnv, gravity_b_z: torch.Tensor) -> torch.Tensor:
         view = _pelvis_view(env, "navigation_outcome")
@@ -138,21 +157,19 @@ class navigation_outcome(ManagerTermBase):
         if gravity.ndim == 1:
             gravity = gravity[None, :]
         gravity_b = world_to_body_vector(quat_w, gravity.expand(quat_w.shape[0], 3))
-        hit = self._collision(env)
+        hit = controller(env).obstacle_contact
         fallen = self._fall(env, gravity_b[:, 2]) & ~hit
         success = (controller(env).distance() < 0.3) & ~hit & ~fallen
         timeout = (env.episode_length_buf >= env.max_episode_length) & ~hit & ~fallen & ~success
-        return dict(
-            collision=hit, fall=fallen, success=success, timeout=timeout
-        )[self._kind]
+        return dict(collision=hit, fall=fallen, success=success, timeout=timeout)[self._kind]
 
 
 class navigation_reward(ManagerTermBase):
     """progress / success / collision / fall / time / smoothness rewards.
 
-    Values are InstinctMJ's per-0.1 s quantities scaled onto high-level
-    boundary steps (every ``high_level_every`` 0.02 s steps) and zero between
-    boundaries, so per-interval totals match the 10 Hz training contract.
+    Every PPO action is executed. Time is a per-second cost; smoothness uses
+    action changes normalized to the original 0.1 s interval. Terminal events
+    and new closest approaches are paid on the step where they occur.
     """
 
     entity_name = "robot"
@@ -165,7 +182,7 @@ class navigation_reward(ManagerTermBase):
         if kind not in self._KINDS:
             raise ValueError(f"navigation_reward kind must be one of {self._KINDS}")
         self._kind = kind
-        self._outcome = None
+        self._outcome: navigation_outcome | None = None
         if kind in ("success", "collision", "fall"):
             self._outcome = navigation_outcome(
                 ManagerTermBaseCfg(func=navigation_outcome, params={"kind": kind}), env
@@ -177,7 +194,7 @@ class navigation_reward(ManagerTermBase):
 
     @property
     def tensor_sensor_names(self) -> tuple[str, ...]:
-        return _OBSTACLE_CONTACT_SENSORS
+        return OBSTACLE_CONTACT_SENSORS
 
     def __call__(self, env: ManagerBasedRlEnv, **params: Any) -> torch.Tensor:
         del params
@@ -186,7 +203,6 @@ class navigation_reward(ManagerTermBase):
             return probe
         device = env.device
         term = controller(env)
-        boundary = term.high_level_boundary
         if self._kind == "progress":
             # New-closest-approach bookkeeping runs once per step (guarded by
             # the shared reward_step slot); backing away cannot earn it again.
@@ -195,22 +211,17 @@ class navigation_reward(ManagerTermBase):
                 delta = (term.best_distance - distance).clamp_min(0)
                 term.best_distance.copy_(torch.minimum(term.best_distance, distance))
                 term.progress.copy_(delta)
-                term.interval_progress += delta
                 term.reward_step = env.common_step_counter
-            if not boundary:
-                return torch.zeros(env.num_envs, device=device)
-            value = term.interval_progress / env.step_dt
-            term.interval_progress.zero_()
-            return value
-        if not boundary:
-            return torch.zeros(env.num_envs, device=device)
+            return term.progress / env.step_dt
         if self._kind == "time":
-            # InstinctMJ charged -0.1 weight per 0.1 s interval (value 1).
-            return torch.full((env.num_envs,), _BOUNDARY_VALUE_SCALE, device=device)
+            return torch.ones(env.num_envs, device=device)
         if self._kind == "smoothness":
             current = env.action_manager.action.clamp(-1, 1)
             previous = env.action_manager.prev_action.clamp(-1, 1)
-            return (current - previous).square().sum(-1) * _BOUNDARY_VALUE_SCALE
+            # Preserve the integrated cost of a linear action ramp over the
+            # same physical interval, independently of the decision frequency.
+            return (current - previous).square().sum(-1) * (_REFERENCE_STEP_DT / env.step_dt) ** 2
+        assert self._outcome is not None
         return self._outcome(env).float() / env.step_dt
 
 

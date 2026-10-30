@@ -176,6 +176,23 @@ def test_matching_manager_policy_io_contract_passes(tmp_path: Path) -> None:
     assert resolve_sim2sim_config(tmp_path, target) is target
 
 
+def test_navigation_action_skipping_checkpoint_rejected_after_cadence_fix(tmp_path: Path) -> None:
+    source = _manager_cfg()
+    source.env.actions = {
+        "navigation": {
+            "_target_": "unilab.tasks.navigation.manager_terms.NavigationActionCfg",
+            "entity_name": "robot",
+            "high_level_every": 5,
+        }
+    }
+    _write_sidecar(tmp_path, extract_contract_snapshot(source))
+    target = OmegaConf.create(OmegaConf.to_container(source, resolve=True))
+    del target.env.actions.navigation.high_level_every
+
+    with pytest.raises(CrossBackendIncompatibleError, match=r"env\.actions"):
+        resolve_sim2sim_config(tmp_path, target)
+
+
 @pytest.mark.parametrize(
     ("path", "value"),
     [

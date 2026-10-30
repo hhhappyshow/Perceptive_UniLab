@@ -4,8 +4,8 @@
 # Instinct-G1-RayCaster-Obstacle-Avoidance-Unitree-v0 (Stage 1).
 #
 # Time base: the env runs at 50 Hz (sim_dt 0.005, ctrl_dt 0.02, 4 substeps)
-# because UniLab applies one control per env step; the navigation action term
-# consumes the 10 Hz high-level residual only every 5 steps.
+# with a residual and low-level update on every PPO transition. See ADR-0011
+# for the Manager-Based runtime boundary; no intermediate PPO action is dropped.
 env:
   scene:
     default_keyframe_name: stand
@@ -148,11 +148,11 @@ env:
         physical_entity: obstacle_2
         root_body_name: obstacle_2/obstacle_box_2
         body_names: [obstacle_2/obstacle_box_2]
+  # The navigation owner samples full-body obstacle contact after every physics
+  # substep (ADR-0022), while PPO and low-level control update every 0.02 s.
   sim_dt: 0.005
   ctrl_dt: 0.02
-  # sim_substeps derives to 4; UniLab applies one control per 0.02 s step and
-  # the navigation action term consumes the 10 Hz high-level action every 5
-  # steps.
+  # sim_substeps derives to 4; both policies update every 0.02 s.
   max_episode_seconds: 20.0
   observations:
     policy:
@@ -232,7 +232,6 @@ env:
       teleop: false
       log_goal: false
       show_rays: false
-      high_level_every: 5
   commands: {}
   events:
     reset_robot_to_stand:
