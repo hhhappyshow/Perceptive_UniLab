@@ -21,7 +21,21 @@ from unilab.managers.manager_base import ManagerTermBase, ManagerTermBaseCfg
 if TYPE_CHECKING:
     from unilab.managers.types import ManagerBasedRlEnv
 
-_TORSO_SUBTREE_GEOMS = (
+# Physical collision geoms that count as an obstacle hit. Feet keep only the
+# forward-most sole capsule (foot4, +X to 0.132 m). Each geom is paired with
+# 3 obstacle boxes and 2 contact fields (found, force): 21 * 3 * 2 = 126 sensors.
+_ROBOT_COLLISION_GEOMS = (
+    "pelvis",
+    "left_hip",
+    "left_thigh",
+    "left_shin",
+    "left_linkage_brace",
+    "right_hip",
+    "right_thigh",
+    "right_shin",
+    "right_linkage_brace",
+    "left_foot4",
+    "right_foot4",
     "torso",
     "head",
     "left_shoulder_yaw",
@@ -36,7 +50,7 @@ _TORSO_SUBTREE_GEOMS = (
 _OBSTACLE_CONTACT_SENSORS = tuple(
     f"obstacle_contact_{index}_{geom}_{field}"
     for index in range(3)
-    for geom in _TORSO_SUBTREE_GEOMS
+    for geom in _ROBOT_COLLISION_GEOMS
     for field in ("found", "force")
 )
 _BOUNDARY_VALUE_SCALE = 5.0  # 0.1 s trained interval / 0.02 s env step
@@ -112,7 +126,7 @@ class navigation_outcome(ManagerTermBase):
         for index in range(3):
             found_any = None
             force_any = None
-            for geom in _TORSO_SUBTREE_GEOMS:
+            for geom in _ROBOT_COLLISION_GEOMS:
                 found = values[f"obstacle_contact_{index}_{geom}_found"] > 0.5
                 force = values[f"obstacle_contact_{index}_{geom}_force"]
                 recent = force.reshape(env.num_envs, -1).norm(dim=-1) > 1e-6
