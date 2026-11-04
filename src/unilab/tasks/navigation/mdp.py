@@ -2,10 +2,9 @@
 
 Every tensor read is declared through ``tensor_body_names`` /
 ``tensor_sensor_names`` so the packed read plan serves the terms without
-backend-specific access. Reward values reproduce InstinctMJ's per-0.1 s
-quantities on high-level boundary steps and emit zero elsewhere; with
-``scale_rewards_by_dt=True`` and a 0.02 s step this keeps per-interval reward
-totals identical to the 10 Hz training contract.
+backend-specific access. The env step is the 0.1 s InstinctMJ decision
+interval, so every reward is InstinctMJ's per-step quantity evaluated on the
+step where it occurs; terminal outcomes cannot fall between updates.
 """
 
 from __future__ import annotations
@@ -53,7 +52,6 @@ _OBSTACLE_CONTACT_SENSORS = tuple(
     for geom in _ROBOT_COLLISION_GEOMS
     for field in ("found", "force")
 )
-_BOUNDARY_VALUE_SCALE = 5.0  # 0.1 s trained interval / 0.02 s env step
 
 
 def controller(env: ManagerBasedRlEnv):
@@ -95,6 +93,21 @@ class goal(ManagerTermBase):
         return controller(env).relative_goal()
 
 
+def read_obstacle_contacts(env: ManagerBasedRlEnv) -> torch.Tensor:
+    """Read this physics sample; the navigation owner latches it per interval."""
+    values = env.scene.read_plan.sensor_tensor_views(
+        env.scene["robot"], _OBSTACLE_CONTACT_SENSORS
+    ).values
+    hit = torch.zeros(env.num_envs, dtype=torch.bool, device=env.device)
+    for index in range(3):
+        for geom in _ROBOT_COLLISION_GEOMS:
+            found = values[f"obstacle_contact_{index}_{geom}_found"]
+            force = values[f"obstacle_contact_{index}_{geom}_force"]
+            hit |= (found.reshape(env.num_envs, -1) > 0.5).any(-1)
+            hit |= force.reshape(env.num_envs, -1).norm(dim=-1) > 1e-6
+    return hit
+
+
 class navigation_outcome(ManagerTermBase):
     """success / collision / fall / timeout outcomes in one packed read."""
 
@@ -118,22 +131,11 @@ class navigation_outcome(ManagerTermBase):
         return _OBSTACLE_CONTACT_SENSORS
 
     def _collision(self, env: ManagerBasedRlEnv) -> torch.Tensor:
-        read_plan = env.scene.read_plan
-        values = read_plan.sensor_tensor_views(
-            env.scene["robot"], _OBSTACLE_CONTACT_SENSORS
-        ).values
-        hits = []
-        for index in range(3):
-            found_any = None
-            force_any = None
-            for geom in _ROBOT_COLLISION_GEOMS:
-                found = values[f"obstacle_contact_{index}_{geom}_found"] > 0.5
-                force = values[f"obstacle_contact_{index}_{geom}_force"]
-                recent = force.reshape(env.num_envs, -1).norm(dim=-1) > 1e-6
-                found_any = found if found_any is None else (found_any | found)
-                force_any = recent if force_any is None else (force_any | recent)
-            hits.append(found_any.reshape(env.num_envs, -1).any(-1) | force_any)
-        return torch.stack(hits).any(0)
+        # InstinctMJ parity: current contact OR any contact within this 0.1 s
+        # interval. The navigation owner latches per-low-level-tick samples in
+        # ``advance_physics``; the final chunk's sample is the interval-end
+        # (current) contact, so the latch alone covers both terms.
+        return controller(env).obstacle_contact
 
     def _fall(self, env: ManagerBasedRlEnv, gravity_b_z: torch.Tensor) -> torch.Tensor:
         view = _pelvis_view(env, "navigation_outcome")
@@ -164,9 +166,8 @@ class navigation_outcome(ManagerTermBase):
 class navigation_reward(ManagerTermBase):
     """progress / success / collision / fall / time / smoothness rewards.
 
-    Values are InstinctMJ's per-0.1 s quantities scaled onto high-level
-    boundary steps (every ``high_level_every`` 0.02 s steps) and zero between
-    boundaries, so per-interval totals match the 10 Hz training contract.
+    Values are InstinctMJ's per-0.1 s quantities on the env's 0.1 s decision
+    step; terminal events are paid on the step where they occur.
     """
 
     entity_name = "robot"
@@ -200,7 +201,6 @@ class navigation_reward(ManagerTermBase):
             return probe
         device = env.device
         term = controller(env)
-        boundary = term.high_level_boundary
         if self._kind == "progress":
             # New-closest-approach bookkeeping runs once per step (guarded by
             # the shared reward_step slot); backing away cannot earn it again.
@@ -209,22 +209,15 @@ class navigation_reward(ManagerTermBase):
                 delta = (term.best_distance - distance).clamp_min(0)
                 term.best_distance.copy_(torch.minimum(term.best_distance, distance))
                 term.progress.copy_(delta)
-                term.interval_progress += delta
                 term.reward_step = env.common_step_counter
-            if not boundary:
-                return torch.zeros(env.num_envs, device=device)
-            value = term.interval_progress / env.step_dt
-            term.interval_progress.zero_()
-            return value
-        if not boundary:
-            return torch.zeros(env.num_envs, device=device)
+            return term.progress / env.step_dt
         if self._kind == "time":
-            # InstinctMJ charged -0.1 weight per 0.1 s interval (value 1).
-            return torch.full((env.num_envs,), _BOUNDARY_VALUE_SCALE, device=device)
+            # InstinctMJ charges -0.1 weight per 0.1 s interval (value 1).
+            return torch.ones(env.num_envs, device=device)
         if self._kind == "smoothness":
             current = env.action_manager.action.clamp(-1, 1)
             previous = env.action_manager.prev_action.clamp(-1, 1)
-            return (current - previous).square().sum(-1) * _BOUNDARY_VALUE_SCALE
+            return (current - previous).square().sum(-1)
         return self._outcome(env).float() / env.step_dt
 
 

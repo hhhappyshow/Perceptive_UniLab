@@ -3,9 +3,10 @@
 # Manager-Based task declaration. Ported from InstinctMJ
 # Instinct-G1-RayCaster-Obstacle-Avoidance-Unitree-v0 (Stage 1).
 #
-# Time base: the env runs at 50 Hz (sim_dt 0.005, ctrl_dt 0.02, 4 substeps)
-# because UniLab applies one control per env step; the navigation action term
-# consumes the 10 Hz high-level residual only every 5 steps.
+# Time base: the env step is the 0.1 s InstinctMJ decision interval
+# (sim_dt 0.005, ctrl_dt 0.1, 20 substeps). Every PPO action takes effect; the
+# owner's advance_physics replays the 50 Hz low-level decimation inside the
+# interval and latches obstacle contact across it.
 env:
   scene:
     default_keyframe_name: stand
@@ -149,10 +150,10 @@ env:
         root_body_name: obstacle_2/obstacle_box_2
         body_names: [obstacle_2/obstacle_box_2]
   sim_dt: 0.005
-  ctrl_dt: 0.02
-  # sim_substeps derives to 4; UniLab applies one control per 0.02 s step and
-  # the navigation action term consumes the 10 Hz high-level action every 5
-  # steps.
+  ctrl_dt: 0.1
+  # sim_substeps derives to 20. One env step is the 0.1 s InstinctMJ decision
+  # interval; the owner's advance_physics runs a low-level ONNX tick every
+  # 0.02 s (4 substeps) inside it and latches obstacle contact per tick.
   max_episode_seconds: 20.0
   observations:
     policy:
@@ -232,7 +233,6 @@ env:
       teleop: false
       log_goal: false
       show_rays: false
-      high_level_every: 5
   commands: {}
   events:
     reset_robot_to_stand:

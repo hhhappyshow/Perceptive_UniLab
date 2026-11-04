@@ -1,11 +1,13 @@
 """Two-rate residual navigation action for UniLab (InstinctMJ port).
 
 The high-level residual policy decides a velocity command at 10 Hz; the frozen
-official unitree ONNX locomotion policy tracks it at 50 Hz. UniLab applies one
-control per env step, so the port runs the env at 50 Hz (sim_dt 0.005,
-ctrl_dt 0.02) and the action term consumes the high-level action only every
-``high_level_every`` steps (default 5 -> 0.1 s), matching InstinctMJ's two-rate
-decimation exactly.
+official unitree ONNX locomotion policy tracks it at 50 Hz. The env step is the
+0.1 s residual cadence (sim_dt 0.005, ctrl_dt 0.1, 20 substeps): every PPO
+action takes effect, and the owner's ``advance_physics`` replays InstinctMJ's
+decimation inside the interval — a low-level ONNX tick every 0.02 s, each
+followed by its 4 physics substeps. Obstacle contact is sampled at the same
+0.02 s cadence and latched across the interval, so a hit anywhere inside it is
+seen by termination and reward.
 
 Keyboard teleop (Instinct ``--teleop`` semantics adapted to UniLab commander
 channels): arrows nudge ``[vx, vy, vyaw]`` increments, Enter zeroes the
@@ -35,6 +37,7 @@ from unilab.envs.mdp.actions.actions import JointPositionActionCfg
 from unilab.envs.mdp.observations import world_to_body_vector
 from unilab.managers.action_manager import ActionTerm, ActionTermCfg
 from unilab.managers.manager_base import ManagerTermBaseCfg
+from unilab.tasks.navigation.mdp import read_obstacle_contacts
 from unilab.tasks.navigation.low_level import (
     OFFICIAL_JOINT_ORDER,
     UnitreeOnnxLocomotion,
@@ -67,7 +70,6 @@ class NavigationActionCfg(ActionTermCfg):
     teleop: bool = False
     log_goal: bool = False
     show_rays: bool = False
-    high_level_every: int = 5
 
     def build(self, env: ManagerBasedRlEnv) -> "NavigationAction":
         return NavigationAction(self, env)
@@ -126,26 +128,27 @@ class NavigationAction(ActionTerm):
         if tuple(name.split("/", 1)[-1] for name in self.low.target_names) != OFFICIAL_JOINT_ORDER:
             raise ValueError("Low-level joint targets are not in official ONNX order")
 
-        if not isinstance(cfg.high_level_every, int) or cfg.high_level_every < 1:
-            raise ValueError("high_level_every must be a positive integer")
-        high_level_dt = env.step_dt * cfg.high_level_every
-        if abs(high_level_dt - _HIGH_LEVEL_PERIOD) > 1e-6:
+        if abs(env.step_dt - _HIGH_LEVEL_PERIOD) > 1e-9:
             raise ValueError(
-                "high_level_every * ctrl_dt must equal the 0.1 s residual cadence; "
-                f"got {high_level_dt} s"
-            )
-        if abs(self.policy.control_dt - env.step_dt) > 1e-9:
-            raise ValueError(
-                "The official low-level policy requires a 0.02 s control step; "
+                "The navigation env step must be the 0.1 s residual cadence "
+                "(ctrl_dt 0.1); the low-level cadence lives inside the interval. "
                 f"env ctrl_dt is {env.step_dt}"
             )
-        self.high_level_every = cfg.high_level_every
-        self.high_level_boundary = False
+        low_substeps = round(self.policy.control_dt / env.physics_dt)
+        if low_substeps < 1 or env.cfg.sim_substeps % low_substeps:
+            raise ValueError(
+                "sim_substeps must be a multiple of the low-level ONNX cadence "
+                f"({self.policy.control_dt} s / {env.physics_dt} s = {low_substeps} "
+                f"substeps); sim_substeps is {env.cfg.sim_substeps}"
+            )
+        self.low_substeps = low_substeps
         self.stage = cfg.stage
-        self._high_level_counter = 0
         self.reward_step = -1
 
         num_envs = env.num_envs
+        self.obstacle_contact = torch.zeros(
+            num_envs, dtype=torch.bool, device=self._device
+        )
         self._raw = torch.zeros(num_envs, 3, device=self._device)
         self.velocity = torch.zeros_like(self._raw)
         self.goal = torch.zeros_like(self._raw)
@@ -153,7 +156,6 @@ class NavigationAction(ActionTerm):
         self.low_time = torch.zeros(num_envs, device=self._device)
         self.best_distance = torch.zeros(num_envs, device=self._device)
         self.progress = torch.zeros(num_envs, device=self._device)
-        self.interval_progress = torch.zeros(num_envs, device=self._device)
         # Goal direction/distance planned by place_obstacles (reset event).
         self._planned_angle = torch.zeros(num_envs, device=self._device)
         self._planned_distance = torch.zeros(num_envs, device=self._device)
@@ -389,15 +391,15 @@ class NavigationAction(ActionTerm):
         return self.policy.command(nominal, torch.zeros_like(nominal))
 
     def process_actions(self, actions: torch.Tensor) -> None:
+        # Every env step is a 0.1 s high-level decision (InstinctMJ parity):
+        # the action always takes effect, and the interval's contact latch
+        # starts empty here.
+        self.obstacle_contact.zero_()
         self._raw.copy_(actions)
-        boundary = self._high_level_counter % self.high_level_every == 0
-        self.high_level_boundary = boundary
-        self._high_level_counter += 1
-        if boundary:
-            self.velocity.copy_(self._high_level_command(actions))
+        self.velocity.copy_(self._high_level_command(actions))
         command = self._teleop_state()
         if command is not None:
-            # The rule layer runs every 50 Hz step while teleoping.
+            # The rule layer runs once per 0.1 s step, as in InstinctMJ.
             self._scan.ensure_bound(self._env)
             self.forward_blocked = forward_blocked(self._scan, self._env)
             blocked = self.forward_blocked & (self.velocity[:, 0] > 0.05)
@@ -409,6 +411,13 @@ class NavigationAction(ActionTerm):
             )
 
     def apply_actions(self) -> None:
+        """One low-level ONNX tick: read state, infer, write joint targets.
+
+        Called 5 times per 0.1 s interval — once from the manager's
+        ``apply_action`` (interval start) and then from the owner's
+        ``advance_physics`` after each 0.02 s chunk, mirroring InstinctMJ's
+        ``apply_actions`` inside the decimation loop.
+        """
         read_plan = self._env.scene.read_plan
         joint = read_plan.joint_tensor_view(self._entity)
         body = read_plan.body_tensor_view(self._entity, ("robot/pelvis",))
@@ -494,7 +503,7 @@ class NavigationAction(ActionTerm):
         self.low_time[ids] = 0
         self.best_distance[ids] = 0
         self.progress[ids] = 0
-        self.interval_progress[ids] = 0
+        self.obstacle_contact[ids] = False
         self.low.reset(ids)
         if isinstance(ids, slice):
             rows = torch.arange(self.num_envs, device=self._device)
@@ -502,7 +511,6 @@ class NavigationAction(ActionTerm):
             rows = torch.as_tensor(ids, device=self._device).reshape(-1)
         count = rows.numel()
         if count == 0:
-            self._high_level_counter = 0
             return
         device = self._device
         origin = self._env.scene.env_origins(device).index_select(0, rows)
@@ -523,15 +531,43 @@ class NavigationAction(ActionTerm):
                     f"goal: x={float(goal[0]):+.3f} y={float(goal[1]):+.3f} "
                     f"z={float(goal[2]):+.3f} distance={float(goal_distance):.3f}"
                 )
-        self._high_level_counter = 0
-
-
 class NavigationManagerBasedEnv(_ConcreteManagerBasedRlEnv):
     """Manager-Based navigation runtime with the play keyboard hook."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.action_manager.get_term("navigation").bind_mocap_bodies()
+
+    def advance_physics(self, ctrl: torch.Tensor) -> dict | None:
+        """InstinctMJ decimation inside one 0.1 s control interval.
+
+        The manager's ``apply_action`` already ran the first low-level ONNX
+        tick on the interval-start state; its targets govern the first chunk.
+        Each remaining chunk steps ``low_substeps`` physics substeps with the
+        current targets, refreshes the read plan, latches obstacle contact
+        (current OR any contact within the interval, InstinctMJ's
+        ``force_history`` role), and runs the next low-level tick on the fresh
+        state. The final chunk's contacts are latched without another tick.
+        """
+        term = self.action_manager.get_term("navigation")
+        read_plan = self.scene.read_plan
+        assert read_plan is not None
+        timing: dict[str, float] = {}
+
+        def _chunk() -> None:
+            result = self.backend.step_tensor(ctrl, term.low_substeps)
+            if result is not None:
+                for name, value in result.get("timing", {}).items():
+                    timing[name] = timing.get(name, 0.0) + value
+            read_plan.invalidate()
+            read_plan.refresh()
+            term.obstacle_contact.logical_or_(read_obstacle_contacts(self))
+
+        for _ in range(self.cfg.sim_substeps // term.low_substeps - 1):
+            _chunk()
+            term.apply_actions()
+        _chunk()
+        return {"timing": timing}
 
     def get_playback_debug_overlays(self):
         """Include action-term overlays (the base aggregates command terms only)."""
